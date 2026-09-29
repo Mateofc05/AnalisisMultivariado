@@ -1,0 +1,206 @@
+---
+jupyter: python3
+---
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+import scipy.stats as stats
+```
+
+```{python}
+nutrition = pd.read_csv("nutrition.csv")
+nutrition.head()
+```
+
+
+Dos muestras aleatorias independientes de tamaño $n = 30$ y $n = 50$ se tomaron de una población con media $\mu_0 = (1000, 18, 80, 700, 75)$ y matriz de covarianza $\Sigma$. Se desea probar la hipótesis nula $H_0: \mu = \mu_0$ contra la alternativa $H_1: \mu \neq \mu_0$ usando el estadístico de prueba de Hotelling.
+
+$X_1, \ldots, X_n ~ N(\mu_1, \Sigma)$ 
+
+$H_0: \mu_1 = \mu_2$ \quad $H_1: \mu_1 \neq \mu_2$
+
+```{python}
+mu_0 = np.array([1000, 18, 80, 700, 75])
+```
+
+```{python}
+X = nutrition.drop(columns=["id"])
+X.head
+```
+
+```{python}
+n = len(X)
+X_bar = X.mean().values
+S = np.cov(X, rowvar=False)
+```
+
+Estadístico de prueba de Hotelling:
+$t^2 = n (\bar{X} - \mu_0)^T S^{-1} (\bar{X} - \mu_0)$
+```{python}
+t2 = n * (X_bar - mu_0).T @ np.linalg.inv(S) @ (X_bar - mu_0)
+```
+
+```{python}
+alpha = 0.05
+p = len(mu_0)
+```
+
+```{python}
+f_quantile = stats.f.ppf(1 - alpha, p, n - p)
+```
+
+Region de rechazo:
+$\frac{(n - p)}{(n - 1) p} t^2 > F_{p, n - p}^{1 - \alpha}$
+```{python}
+(n-p)/((n-1)*p) * t2 > f_quantile
+```
+
+```{python}
+ci = stats.ttest_1samp(X["calcium"], mu_0[0]).confidence_interval(confidence_level=0.95)
+(round(ci.low,4), round(ci.high,4))
+```
+
+```{python}
+def multiple_t_testci(X: pd.DataFrame, mu_0: np.array, alpha: float = 0.05) -> pd.DataFrame:
+    '''
+    Calcula intervalos de confianza basados en la prueba t para múltiples variables.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos.
+    mu_0: np.array
+        Arreglo con los valores hipotéticos de las medias.
+    alpha: float
+        Nivel de significancia.
+
+    Output
+    ------
+    results: pd.DataFrame
+        Data frame con los nombres de las variables, límites inferior y superior del intervalo de confianza y valor de la media hipotética.
+    '''
+    ## Creamos una lista vacía para
+    ## ir guardando los resultados
+    results = []
+
+    ## Realizamos un ciclo for para
+    ## encontrar los intervalos para
+    ## cada una de las variables
+    for i, col in enumerate(X.columns):
+        ## Extraemos la variable
+        data = X[col]
+
+        ## Calculamos la prueba t
+        res = stats.ttest_1samp(data, mu_0[i])
+
+        ## Encontramos el intervalo de confianza
+        ci = res.confidence_interval(confidence_level=1-alpha)
+
+        ## Añadimos el resultado como
+        ## un diccionario a la lista
+        results.append({"variable": col,
+                        "lower": ci.low,
+                        "upper": ci.high,
+                        "recommended": mu_0[i]})
+
+    return pd.DataFrame(results)
+```
+
+```{python}
+multiple_t_testci(X, mu_0, alpha=0.05)
+```
+
+```{python}
+def bonferroni(X: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
+    '''
+    Calcula intervalos de confianza simultáneos con corrección de Bonferroni.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos.
+    alpha: float
+        Nivel de significancia.
+
+    Output
+    ------
+    res: pd.DataFrame
+        Data frame con los nombres de las variables, sus medias muestrales y los límites inferior y superior del intervalo de confianza con corrección de Bonferroni.
+    '''
+    ## Encontramos el tamaño de
+    ## muestra y número de variables
+    n, p = X.shape
+
+    ## Extraemos los nombres de las variables
+    cols = X.columns
+
+    ## Calculamos las medias
+    ## muestrales y las varianzas
+    ## muestrales de cada variable
+    mm = X.mean()
+    ss = X.var()
+
+    ## Encontramos el cuantil
+    ## de la distribución t
+    tt = stats.t.ppf(1 - alpha / (2 * p), n - 1)
+
+    ## Encontramos los límites
+    ## inferior y superior del
+    ## intervalo corregido
+    lower = mm - tt * np.sqrt(ss / n)
+    upper = mm + tt * np.sqrt(ss / n)
+
+    ## Juntamos los resultados
+    ## en un solo data frame
+    res = pd.DataFrame({"variable": cols,
+                        "mean": mm,
+                        "lower": lower,
+                        "upper": upper})
+
+    return res
+```
+
+```{python}
+bonferroni(X)
+```
+
+```{python}
+Z = X / mu_0
+```
+
+```{python}
+bf = bonferroni(Z)
+```
+
+```{python}
+bf["variable"] = ["Calcium", "Iron", "Protein", "Vitamin A", "Vitamin C"]
+```
+
+```{python}
+from plotnine import ggplot, aes, geom_pointrange, geom_hline, labs, theme_bw, theme, element_text, ggsave
+```
+
+```{python}
+p = (ggplot(bf, aes(x = "variable", y = "mean")) +
+        geom_pointrange(aes(ymin = "lower", ymax = "upper"), color = "dodgerblue") +
+        geom_hline(yintercept = 1, linetype = "dashed", color = "gray") +
+        labs(x = "", y = "Ratio", title = "Profile plot") +
+        theme_bw() +
+        theme(plot_title = element_text(ha = "center",
+                                        weight = "bold",
+                                        margin = {"b":5}),
+              axis_title_x = element_text(weight = "bold"),
+              axis_title_y = element_text(weight = "bold", rotation = 90),
+              axis_text_x = element_text(size = 12, weight = "bold"),
+              legend_title = element_text(ha = "center", weight = "bold"),
+              legend_text = element_text(ha = "center"),
+              strip_text = element_text(ha = "center", weight = "bold",
+                                        margin = {"t":2, "r":3, "b":3, "l":3}),
+              plot_subtitle = element_text(ha = "center", weight = "bold",
+                                        size = 10, margin = {"b":5})) +
+        theme(figure_size = (7, 7*0.618)))
+p
+```

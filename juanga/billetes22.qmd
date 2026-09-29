@@ -1,0 +1,315 @@
+---
+jupyter: python3
+---
+
+# Buscando a Juanga 
+
+```{python}
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.stats as stats
+```
+
+## Tinta incautada
+
+```{python}
+ink_incautada = pd.read_csv('ink_test.csv')
+ink_incautada.head(5)
+
+ink_combinado = pd.read_csv('combinado.csv')
+ink_combinado.head(5)
+```
+
+```{python}
+numeric_vars=['pigmento_magnetico_pct','viscosidad_cp','ph','reflectancia_uv_pct','tiempo_secado_s']
+```
+
+```{python}
+µ = ink_incautada[numeric_vars].mean()
+µ0 = ink_combinado[numeric_vars].mean()
+# µ0=[ 8.70442424, 544.99833333, 7.76760606, 32.09804545,28.50213636 ]
+# µ=[ 2.484 , 108.744 , 6.94066667, 35.70533333,12.924 ]
+```
+
+**Definimos hipotesis nula y alternativa:**
+$H_o: \mu = \mu_0$
+$H_a: \mu \neq \mu_0$
+
+```{python}
+mu_0 = µ0
+mu = µ
+```
+
+```{python}
+X = ink_incautada.drop(columns=["id_muestra"])
+X.head()
+```
+
+Estadístico de prueba de Hotelling:
+$t^2 = n (\bar{X} - \mu_0)^T S^{-1} (\bar{X} - \mu_0)$
+```{python}
+def singleHotellingsT2Test(X: pd.DataFrame, mu_0: np.array, alpha: float = 0.05) -> float:
+    """
+    Calcula el estadístico de prueba de Hotelling T^2 para una muestra multivariada.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos.
+    mu_0: np.array
+        Arreglo con los valores hipotéticos de las medias.
+    alpha: float
+        Nivel de significancia.
+    """
+    n = len(X)
+    X_bar = X.mean().values
+    S = np.cov(X, rowvar=False)
+    p = len(mu_0)
+
+    t2 = n * (X_bar - mu_0).T @ np.linalg.inv(S) @ (X_bar - mu_0)
+    statistic = (n-p)/((n-1)*p) * t2 
+    f_quantile = stats.f.ppf(1 - alpha, p, n - p)
+    p_value = 1 - stats.f.cdf(statistic, p, n - p)
+
+    ## Imprimimos el resultado
+    print(f"Estadística de prueba: {statistic}\nGrados de libertad: {p}, {n + p}\nregion de rechazo: {f_quantile}\nnivel de significancia: {alpha}")
+
+    if (statistic > f_quantile):
+        print("Se rechaza la hipótesis nula: las medias son diferentes.")
+    else:
+        print("No se rechaza la hipótesis nula: no hay evidencia suficiente para afirmar que las medias son diferentes.")
+
+    return statistic, f_quantile, p_value
+```
+
+```{python}
+# True significa que se rechaza la hipótesis nula, es decir, que las medias son diferentes
+statistic, f_quantile, p_value = singleHotellingsT2Test(X, mu_0, alpha=0.05)
+```
+
+Se rechaza la hipotesis nula con un p-valor << 0.05, lo que indica que las medias de las variables medidas en la tinta incautada son significativamente diferentes de las medias de las variables medidas en la tinta combinada. Esto sugiere que la tinta incautada no proviene de la misma población que la tinta combinada, lo que podría indicar una diferencia en la composición química o en el proceso de fabricación de las tintas.
+
+## Bank Notes
+
+```{python}
+bank_notes = pd.read_csv('bank_notes.csv')
+bank_notes.head(5)
+```
+
+```{python}
+sample  = bank_notes[bank_notes['type'] == 'sample']
+suspect = bank_notes[bank_notes['type'] == 'suspect']
+
+num_sample = sample.drop(columns=["type"])
+num_suspect = suspect.drop(columns=["type"])
+```
+
+**Definimos hipotesis nula y alternativa:**
+$H_o: \mu_{lenght} = \mu_{0-lenght}$
+$H_a: \mu_{lenght} \neq \mu_{0-lenght}$
+$H_o: \mu_{thick}    = \mu_{0-thick}$
+$H_a: \mu_{thick} \neq \mu_{0-thick}$
+$H_o: \mu_{left}    = \mu_{0-left}$
+$H_a: \mu_{left} \neq \mu_{0-left}$
+$H_o: \mu_{right}    = \mu_{0-right}$
+$H_a: \mu_{right} \neq \mu_{0-right}$
+$H_o: \mu_{width}    = \mu_{0-width}$
+$H_a: \mu_{width} \neq \mu_{0-width}$
+$H_o: \mu_{bottom}    = \mu_{0-bottom}$
+$H_a: \mu_{bottom} \neq \mu_{0-bottom}$
+$H_o: \mu_{top}    = \mu_{0-top}$
+$H_a: \mu_{top} \neq \mu_{0-top}$
+$H_o: \mu_{weight}    = \mu_{0-weight}$
+$H_a: \mu_{weight} \neq \mu_{0-weight}$
+$H_o: \mu_{diag}    = \mu_{0-diag}$
+$H_a: \mu_{diag} \neq \mu_{0-diag}$
+
+```{python}
+def multiple_ttest_ind(X: pd.DataFrame, Y: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
+    
+    '''
+    Realiza pruebas t independientes para múltiples variables entre dos muestras.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos de la primera población.
+    Y: pd.DataFrame
+        Matriz de datos de la segunda población.
+    alpha: float
+        Nivel de significancia.
+
+    Output
+    ------
+    results: pd.DataFrame
+        DataFrame con los resultados de las pruebas t para cada variable.
+    '''
+    results = []
+    for col in X.columns:
+        t_stat, p_val = stats.ttest_ind(X[col], Y[col], equal_var=False)
+        reject_null = p_val < alpha
+        results.append({
+            'Variable': col,
+            't-statistic': t_stat,
+            'p-value': p_val,
+            'Reject H0': reject_null
+        })
+    
+    return pd.DataFrame(results)
+```
+
+```{python}
+multiple_ttest_ind(num_sample, num_suspect, alpha=0.05)
+```
+
+```{python}
+def bonferroni(X: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
+    '''
+    Calcula intervalos de confianza simultáneos con corrección de Bonferroni.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos.
+    alpha: float
+        Nivel de significancia.
+
+    Output
+    ------
+    res: pd.DataFrame
+        Data frame con los nombres de las variables, sus medias muestrales y los límites inferior y superior del intervalo de confianza con corrección de Bonferroni.
+    '''
+    ## Encontramos el tamaño de
+    ## muestra y número de variables
+    n, p = X.shape
+
+    ## Extraemos los nombres de las variables
+    cols = X.columns
+
+    ## Calculamos las medias
+    ## muestrales y las varianzas
+    ## muestrales de cada variable
+    mm = X.mean()
+    ss = X.var()
+
+    ## Encontramos el cuantil
+    ## de la distribución t
+    tt = stats.t.ppf(1 - alpha / (2 * p), n - 1)
+
+    ## Encontramos los límites
+    ## inferior y superior del
+    ## intervalo corregido
+    lower = mm - tt * np.sqrt(ss / n)
+    upper = mm + tt * np.sqrt(ss / n)
+
+    ## Juntamos los resultados
+    ## en un solo data frame
+    res = pd.DataFrame({"variable": cols,
+                        "mean": mm,
+                        "lower": lower,
+                        "upper": upper})
+
+    return res
+```
+
+```{python}
+num_bank_notes = bank_notes.drop(columns=["type"])
+bonferroni(num_bank_notes)
+```
+
+Estadístico de prueba de Hotelling:
+$t^2 = n (\bar{X_1} - \bar{X_2})^T [S_p(\frac{1}{n}+\frac{1}{m})] (\bar{X_1} - \bar{X_2})$
+
+$S_p = \frac{(n-1)S_1 + (m-1)S_2}{n + m - 2}$
+
+```{python}
+def doubleHotellingsT2Test(X: pd.DataFrame, Y: pd.DataFrame, alpha: float = 0.05) -> tuple[np.float64, np.float64]:
+    '''
+    Realiza la prueba T2 de Hotelling para dos muestras.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos de la primera población.
+    Y: pd.DataFrame
+        Matriz de datos de la segunda población.
+
+    Output
+    ------
+    statistic: np.float64
+        Valor de la estadística de prueba.
+    p-value: np.float64
+        P-value resultante.
+    '''
+    ## Encontramos los tamaños de
+    ## muestra y el número de variables
+    n, p = X.shape
+    m = Y.shape[0]
+
+    ## Calculamos la diferencia de medias
+    ## muestrales, las matrices de covarianza
+    ## y la matriz de covarianza agrupada
+    delta = (X.mean().values - Y.mean().values)
+    Sx = np.cov(X, rowvar=False)
+    Sy = np.cov(Y, rowvar=False)
+    S_pooled = ((n - 1) * Sx + (m - 1) * Sy) / (n + m - 2)
+
+    ## Calculamos la estadística de prueba
+    t2 = delta @ np.linalg.inv(S_pooled * (1/n + 1/m)) @ delta
+    statistic = (n+m-p-1)/(p*(n+m-2)) * t2
+
+    ## Calculamos el p-value
+    p_value = 1 - stats.f.cdf(statistic, p, n+m-p-1)
+
+    ## Imprimimos el resultado
+    print(f"Estadística de prueba: {statistic}\nGrados de libertad: {p}, {n + m - p - 1}\np-value: {p_value}\nnivel de significancia: {alpha}")
+
+    if p_value < alpha:
+        print("Se rechaza la hipótesis nula: las medias son diferentes.")
+    else:
+        print("No se rechaza la hipótesis nula: no hay evidencia suficiente para afirmar que las medias son diferentes.")
+
+    return statistic, p_value
+```
+
+```{python}
+statistic, p_value = doubleHotellingsT2Test(num_sample, num_suspect)
+```
+
+Se rechaza la hipotesis nula con un p-valor << 0.05, lo que indica que las medias de las variables medidas en la tinta incautada son significativamente diferentes de las medias de las variables medidas en la tinta combinada. Esto sugiere que la tinta incautada no proviene de la misma población que la tinta combinada, lo que podría indicar una diferencia en la composición química o en el proceso de fabricación de las tintas.
+
+```{python}
+from plotnine import ggplot, aes, geom_pointrange, geom_hline, labs, theme_bw, theme, element_text, ggsave
+```
+
+```{python}
+bn_mu_0 = num_sample.mean()
+Z = num_bank_notes / bn_mu_0
+bf = bonferroni(Z)
+```
+
+```{python}
+p = (ggplot(bf, aes(x = "variable", y = "mean")) +
+        geom_pointrange(aes(ymin = "lower", ymax = "upper"), color = "dodgerblue") +
+        geom_hline(yintercept = 1, linetype = "dashed", color = "gray") +
+        labs(x = "", y = "Ratio", title = "Profile plot") +
+        theme_bw() +
+        theme(plot_title = element_text(ha = "center",
+                                        weight = "bold",
+                                        margin = {"b":5}),
+              axis_title_x = element_text(weight = "bold"),
+              axis_title_y = element_text(weight = "bold", rotation = 90),
+              axis_text_x = element_text(size = 12, weight = "bold"),
+              legend_title = element_text(ha = "center", weight = "bold"),
+              legend_text = element_text(ha = "center"),
+              strip_text = element_text(ha = "center", weight = "bold",
+                                        margin = {"t":2, "r":3, "b":3, "l":3}),
+              plot_subtitle = element_text(ha = "center", weight = "bold",
+                                        size = 10, margin = {"b":5})) +
+        theme(figure_size = (7, 7*0.618)))
+p
+```
+
+Podemos observar que en categorias como "thick", "wheigh" y "width" los billetes sospechozos se alejan bastante de la media +10%, de igual manera aunque en menor magnitud el "bottom" y "top" divergen un poco. Esto nos dice cuales son las variables que más varian entre las muestras incautadas y la media real.

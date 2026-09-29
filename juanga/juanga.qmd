@@ -1,0 +1,339 @@
+---
+jupyter: python3
+---
+
+# Buscando a Juanga 
+
+```{python}
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.stats as stats
+```
+
+## Tinta incautada
+
+```{python}
+tinta_decomisada = pd.read_csv('data/ink.csv')
+tinta_decomisada.head(5)
+
+tinta_referencia = pd.read_csv('data/combinado.csv').rename(columns={
+    'viscosidad_cP': 'viscosidad_cp',
+    'pH': 'ph',
+    'reflectancia_UV_pct': 'reflectancia_uv_pct',
+    'secado_s': 'tiempo_secado_s'
+})
+tinta_referencia.head(5)
+```
+
+```{python}
+variables_quimicas = ['pigmento_magnetico_pct', 'viscosidad_cp', 'ph',
+                      'reflectancia_uv_pct', 'tiempo_secado_s']
+```
+
+```{python}
+media_decomisada = tinta_decomisada[variables_quimicas].mean()
+media_referencia = tinta_referencia[variables_quimicas].mean()
+# Estos vectores representan las medias de ambos grupos y sirven como base para la comparación.
+```
+
+**Definimos hipotesis nula y alternativa:**
+$H_o: \mu = \mu_0$
+$H_a: \mu \neq \mu_0$
+
+```{python}
+vector_media_nula = media_referencia
+vector_media_observada = media_decomisada
+```
+
+```{python}
+datos_tinta = tinta_decomisada.drop(columns=["id_muestra"])
+datos_tinta.head()
+```
+
+Estadístico de prueba de Hotelling:
+$t^2 = n (\bar{X} - \mu_0)^T S^{-1} (\bar{X} - \mu_0)$
+```{python}
+def singleHotellingsT2Test(datos: pd.DataFrame, media_nula: np.array,
+                           nivel_alpha: float = 0.05) -> float:
+    """
+    Aplica el contraste T² de Hotelling a una sola muestra multivariada.
+
+    Parámetros
+    ----------
+    datos: pd.DataFrame
+        Observaciones de las variables que se desean contrastar.
+    media_nula: np.array
+        Vector de medias establecido por la hipótesis nula.
+    nivel_alpha: float
+        Probabilidad máxima permitida para el error tipo I.
+    """
+    total_observaciones = len(datos)
+    media_muestral = datos.mean().values
+    matriz_covarianza = np.cov(datos, rowvar=False)
+    total_variables = len(media_nula)
+    diferencia_medias = media_muestral - media_nula
+
+    t_cuadrada = (total_observaciones * diferencia_medias.T
+                  @ np.linalg.inv(matriz_covarianza) @ diferencia_medias)
+    estadistico_f = ((total_observaciones - total_variables) /
+                     ((total_observaciones - 1) * total_variables) * t_cuadrada)
+    valor_critico_f = stats.f.ppf(
+        1 - nivel_alpha, total_variables, total_observaciones - total_variables
+    )
+    valor_p = 1 - stats.f.cdf(
+        estadistico_f, total_variables, total_observaciones - total_variables
+    )
+
+    # Mostramos el estadístico obtenido junto con los valores que permiten tomar la decisión.
+    print(f"Estadística de prueba: {estadistico_f}\nGrados de libertad: {total_variables}, {total_observaciones + total_variables}\nregion de rechazo: {valor_critico_f}\nnivel de significancia: {nivel_alpha}")
+
+    if estadistico_f > valor_critico_f:
+        print("Se rechaza la hipótesis nula: las medias son diferentes.")
+    else:
+        print("No se rechaza la hipótesis nula: no hay evidencia suficiente para afirmar que las medias son diferentes.")
+
+    return estadistico_f, valor_critico_f, valor_p
+```
+
+```{python}
+# Aplicamos el contraste utilizando un nivel de significancia de 0.05.
+estadistico_tinta, limite_critico_tinta, p_tinta = singleHotellingsT2Test(
+    datos_tinta, vector_media_nula, nivel_alpha=0.05
+)
+```
+
+El p-valor obtenido es claramente inferior a 0.05, por lo que se descarta la hipótesis nula. En consecuencia, el conjunto de medias de las variables analizadas en la tinta incautada difiere significativamente del correspondiente a la tinta combinada. Este resultado indica que ambas muestras probablemente no pertenecen a la misma población, posiblemente debido a diferencias en su composición química o en su proceso de elaboración.
+
+## Bank Notes
+
+```{python}
+billetes = pd.read_csv('data/bank_notes.csv')
+billetes.head(5)
+```
+
+```{python}
+muestra_billetes = billetes[billetes['type'] == 'sample']
+billetes_sospechosos = billetes[billetes['type'] == 'suspect']
+
+muestra_numerica = muestra_billetes.drop(columns=["type"])
+sospechosos_numericos = billetes_sospechosos.drop(columns=["type"])
+```
+
+**Definimos hipotesis nula y alternativa:**
+$H_o: \mu_{lenght} = \mu_{0-lenght}$
+$H_a: \mu_{lenght} \neq \mu_{0-lenght}$
+$H_o: \mu_{thick}    = \mu_{0-thick}$
+$H_a: \mu_{thick} \neq \mu_{0-thick}$
+$H_o: \mu_{left}    = \mu_{0-left}$
+$H_a: \mu_{left} \neq \mu_{0-left}$
+$H_o: \mu_{right}    = \mu_{0-right}$
+$H_a: \mu_{right} \neq \mu_{0-right}$
+$H_o: \mu_{width}    = \mu_{0-width}$
+$H_a: \mu_{width} \neq \mu_{0-width}$
+$H_o: \mu_{bottom}    = \mu_{0-bottom}$
+$H_a: \mu_{bottom} \neq \mu_{0-bottom}$
+$H_o: \mu_{top}    = \mu_{0-top}$
+$H_a: \mu_{top} \neq \mu_{0-top}$
+$H_o: \mu_{weight}    = \mu_{0-weight}$
+$H_a: \mu_{weight} \neq \mu_{0-weight}$
+$H_o: \mu_{diag}    = \mu_{0-diag}$
+$H_a: \mu_{diag} \neq \mu_{0-diag}$
+
+```{python}
+def multiple_ttest_ind(grupo_base: pd.DataFrame, grupo_comparado: pd.DataFrame,
+                       nivel_alpha: float = 0.05) -> pd.DataFrame:
+    
+    '''
+    Compara dos grupos mediante una prueba t independiente por cada variable.
+
+    Parámetros
+    ----------
+    grupo_base: pd.DataFrame
+        Variables numéricas del grupo usado como referencia.
+    grupo_comparado: pd.DataFrame
+        Variables numéricas del grupo que se contrasta.
+    nivel_alpha: float
+        Umbral utilizado para decidir si se rechaza H0.
+
+    Output
+    ------
+    tabla_resultados: pd.DataFrame
+        Resumen del estadístico, valor p y decisión para cada columna.
+    '''
+    filas_resultado = []
+    for variable in grupo_base.columns:
+        estadistico_t, valor_p = stats.ttest_ind(
+            grupo_base[variable], grupo_comparado[variable], equal_var=False
+        )
+        rechazar_h0 = valor_p < nivel_alpha
+        filas_resultado.append({
+            'Variable': variable,
+            't-statistic': estadistico_t,
+            'p-value': valor_p,
+            'Reject H0': rechazar_h0
+        })
+    
+    return pd.DataFrame(filas_resultado)
+```
+
+```{python}
+multiple_ttest_ind(muestra_numerica, sospechosos_numericos, nivel_alpha=0.05)
+```
+
+```{python}
+def bonferroni(datos: pd.DataFrame, nivel_alpha: float = 0.05) -> pd.DataFrame:
+    '''
+    Construye intervalos simultáneos aplicando el ajuste de Bonferroni.
+
+    Parámetros
+    ----------
+    datos: pd.DataFrame
+        Conjunto de variables numéricas por analizar.
+    nivel_alpha: float
+        Nivel de significancia conjunto.
+
+    Output
+    ------
+    intervalos: pd.DataFrame
+        Tabla con la media y los extremos del intervalo para cada variable.
+    '''
+    # Identificamos el tamaño de la muestra y el número de comparaciones involucradas.
+    numero_filas, numero_variables = datos.shape
+    nombres_variables = datos.columns
+
+    # Estimamos la media y la varianza de cada variable.
+    medias = datos.mean()
+    varianzas = datos.var()
+
+    # Ajustamos el cuantil de la distribución t según el número de variables.
+    cuantil_t = stats.t.ppf(
+        1 - nivel_alpha / (2 * numero_variables), numero_filas - 1
+    )
+
+    # Usamos el error estándar para obtener los límites del intervalo.
+    limites_inferiores = medias - cuantil_t * np.sqrt(varianzas / numero_filas)
+    limites_superiores = medias + cuantil_t * np.sqrt(varianzas / numero_filas)
+
+    # Reunimos las estimaciones y sus límites en una tabla de resultados.
+    intervalos = pd.DataFrame({
+        "variable": nombres_variables,
+        "mean": medias,
+        "lower": limites_inferiores,
+        "upper": limites_superiores
+    })
+
+    return intervalos
+```
+
+```{python}
+billetes_numericos = billetes.drop(columns=["type"])
+bonferroni(billetes_numericos)
+```
+
+Estadístico de prueba de Hotelling:
+$t^2 = n (\bar{X_1} - \bar{X_2})^T [S_p(\frac{1}{n}+\frac{1}{m})] (\bar{X_1} - \bar{X_2})$
+
+$S_p = \frac{(n-1)S_1 + (m-1)S_2}{n + m - 2}$
+
+```{python}
+def doubleHotellingsT2Test(grupo_uno: pd.DataFrame, grupo_dos: pd.DataFrame,
+                           nivel_alpha: float = 0.05) -> tuple[np.float64, np.float64]:
+    '''
+    Evalúa la igualdad de dos vectores de medias con la prueba T² de Hotelling.
+
+    Parámetros
+    ----------
+    grupo_uno: pd.DataFrame
+        Observaciones correspondientes a la primera muestra.
+    grupo_dos: pd.DataFrame
+        Observaciones correspondientes a la segunda muestra.
+
+    Output
+    ------
+    estadistico_f: np.float64
+        Transformación de T² que sigue una distribución F.
+    valor_p: np.float64
+        Probabilidad asociada con el resultado observado.
+    '''
+    # Guardamos el número de observaciones de cada grupo y la cantidad de variables.
+    filas_uno, numero_variables = grupo_uno.shape
+    filas_dos = grupo_dos.shape[0]
+
+    # Combinamos las matrices de covarianza ponderándolas por sus grados de libertad.
+    diferencia_medias = grupo_uno.mean().values - grupo_dos.mean().values
+    covarianza_uno = np.cov(grupo_uno, rowvar=False)
+    covarianza_dos = np.cov(grupo_dos, rowvar=False)
+    covarianza_combinada = (
+        (filas_uno - 1) * covarianza_uno + (filas_dos - 1) * covarianza_dos
+    ) / (filas_uno + filas_dos - 2)
+
+    # Obtenemos T² y lo transformamos en el estadístico F correspondiente.
+    factor_tamanos = 1 / filas_uno + 1 / filas_dos
+    t_cuadrada = (diferencia_medias
+                  @ np.linalg.inv(covarianza_combinada * factor_tamanos)
+                  @ diferencia_medias)
+    estadistico_f = (
+        (filas_uno + filas_dos - numero_variables - 1) /
+        (numero_variables * (filas_uno + filas_dos - 2)) * t_cuadrada
+    )
+
+    # Calculamos el valor p utilizando la distribución F del contraste.
+    grados_libertad_dos = filas_uno + filas_dos - numero_variables - 1
+    valor_p = 1 - stats.f.cdf(
+        estadistico_f, numero_variables, grados_libertad_dos
+    )
+
+    # Presentamos el resultado y determinamos la decisión a partir del valor p.
+    print(f"Estadística de prueba: {estadistico_f}\nGrados de libertad: {numero_variables}, {grados_libertad_dos}\np-value: {valor_p}\nnivel de significancia: {nivel_alpha}")
+
+    if valor_p < nivel_alpha:
+        print("Se rechaza la hipótesis nula: las medias son diferentes.")
+    else:
+        print("No se rechaza la hipótesis nula: no hay evidencia suficiente para afirmar que las medias son diferentes.")
+
+    return estadistico_f, valor_p
+```
+
+```{python}
+estadistico_billetes, p_billetes = doubleHotellingsT2Test(
+    muestra_numerica, sospechosos_numericos
+)
+```
+
+Debido a que el valor p se encuentra muy por debajo de 0.05, se rechaza la hipótesis nula. Considerando todas las variables simultáneamente, los billetes sospechosos tienen un vector de medias diferente al observado en los billetes de referencia. Por tanto, existe evidencia de que los dos grupos difieren en sus características promedio y no representan la misma población.
+
+```{python}
+from plotnine import ggplot, aes, geom_pointrange, geom_hline, labs, theme_bw, theme, element_text, ggsave
+```
+
+```{python}
+perfil_referencia = muestra_numerica.mean()
+razones_por_variable = billetes_numericos / perfil_referencia
+intervalos_perfil = bonferroni(razones_por_variable)
+```
+
+```{python}
+grafica_perfil = (ggplot(intervalos_perfil, aes(x = "variable", y = "mean")) +
+        geom_pointrange(aes(ymin = "lower", ymax = "upper"), color = "dodgerblue") +
+        geom_hline(yintercept = 1, linetype = "dashed", color = "gray") +
+        labs(x = "", y = "Ratio", title = "Profile plot") +
+        theme_bw() +
+        theme(plot_title = element_text(ha = "center",
+                                        weight = "bold",
+                                        margin = {"b":5}),
+              axis_title_x = element_text(weight = "bold"),
+              axis_title_y = element_text(weight = "bold", rotation = 90),
+              axis_text_x = element_text(size = 12, weight = "bold"),
+              legend_title = element_text(ha = "center", weight = "bold"),
+              legend_text = element_text(ha = "center"),
+              strip_text = element_text(ha = "center", weight = "bold",
+                                        margin = {"t":2, "r":3, "b":3, "l":3}),
+              plot_subtitle = element_text(ha = "center", weight = "bold",
+                                        size = 10, margin = {"b":5})) +
+        theme(figure_size = (7, 7*0.618)))
+grafica_perfil
+```
+
+El gráfico muestra que las variables "thick", "wheigh" y "width" son las que más se separan de la referencia del 100% en los billetes sospechosos. Las variables "bottom" y "top" también presentan diferencias, aunque de menor tamaño. Así, estas medidas permiten identificar qué características se apartan más del perfil promedio de los billetes de referencia.

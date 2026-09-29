@@ -1,0 +1,259 @@
+--
+title: "Nutrición: prueba hotelling"
+format: html
+
+---
+
+
+```{python}
+# Importamos las librerías para manipular datos, realizar cálculos
+# numéricos y estadísticos, y crear visualizaciones.
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scipy.stats as stats
+```
+
+```{python}
+# Leemos el archivo CSV y lo guardamos como un DataFrame.
+nutrition = pd.read_csv("/Users/mateoflores/Documents/Tec/ProjectMultivariados/data/nutrition.csv")
+
+# Mostramos las primeras filas para revisar la estructura y las variables.
+nutrition.head()
+```
+
+
+```{python}
+# Definimos el vector de medias recomendado bajo la hipótesis nula.
+# Cada valor corresponde, en orden, a una de las variables de X.
+mu_0 = np.array([1000, 18, 80, 700, 75])
+```
+
+
+```{python}
+# Eliminamos la columna identificadora, ya que no es una variable nutricional
+# que deba incluirse en el análisis multivariado.
+X = nutrition.drop(columns=['id'])
+
+# Verificamos el conjunto de datos que se utilizará en los cálculos.
+X.head()
+```
+
+
+```{python}
+# Obtenemos el número de observaciones de la muestra.
+n = len(X)
+
+# Calculamos el vector de medias muestrales de las variables.
+X_bar = X.mean().values
+
+# Calculamos la matriz de covarianzas muestral. Con rowvar=False se indica
+# que las columnas representan las variables y las filas, las observaciones.
+S = np.cov(X, rowvar = False)
+```
+
+
+```{python}
+# Calculamos el estadístico T² de Hotelling. Este mide la distancia conjunta
+# entre las medias observadas y las medias propuestas en mu_0, considerando
+# las varianzas y covarianzas de las variables mediante la inversa de S.
+t2 = n * (X_bar - mu_0) @ np.linalg.inv(S) @ (X_bar - mu_0)
+```
+
+
+```{python}
+# Fijamos un nivel de significancia del 5 %.
+alpha = 0.05
+
+# Guardamos el número de variables incluidas en la prueba multivariada.
+p = len(mu_0)
+```
+
+
+```{python}
+# Importamos el módulo de distribuciones y pruebas estadísticas de SciPy.
+from scipy import stats
+
+# Obtenemos el valor crítico de una distribución F con p y n-p
+# grados de libertad para una prueba con nivel de significancia alpha.
+f_quantile = stats.f.ppf(1 - alpha, p, n - p)
+```
+
+```{python}
+# Transformamos T² a su escala equivalente de F y lo comparamos con el
+# valor crítico. Un resultado True indica que se rechaza la hipótesis nula.
+(n - p)/((n-1) * p) * t2 > f_quantile
+```
+
+```{python}
+# Calculamos la prueba t de una muestra para la variable calcium, usando
+# como media hipotética el primer valor de mu_0, y extraemos su IC del 95 %.
+ci = stats.ttest_1samp(X["calcium"], mu_0[0]).confidence_interval(confidence_level = 0.95)
+
+# Mostramos los límites inferior y superior redondeados a cuatro decimales.
+(round(ci.low, 4)), (round(ci.high, 4))
+```
+
+```{python}
+def multiple_t_testci(X: pd.DataFrame, mu_0: np.array, alpha: float = 0.05) -> pd.DataFrame:
+    '''
+    Calcula intervalos de confianza basados en la prueba t para múltiples variables.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos.
+    mu_0: np.array
+        Arreglo con los valores hipotéticos de las medias.
+    alpha: float
+        Nivel de significancia.
+
+    Output
+    ------
+    results: pd.DataFrame
+        Data frame con los nombres de las variables, límites inferior y superior del intervalo de confianza y valor de la media hipotética.
+    '''
+    ## Creamos una lista vacía para
+    ## ir guardando los resultados.
+    results = []
+
+    ## Realizamos un ciclo for para
+    ## encontrar los intervalos para
+    ## cada una de las variables
+    for i, col in enumerate(X.columns):
+        ## Extraemos la variable
+        data = X[col]
+
+        ## Calculamos la prueba t
+        res = stats.ttest_1samp(data, mu_0[i])
+
+        ## Encontramos el intervalo de confianza
+        ci = res.confidence_interval(confidence_level = 1 - alpha)
+
+        ## Añadimos el resultado como
+        ## un diccionario a la lista
+        results.append({"variable": col,
+                        "lower": ci.low,
+                        "upper": ci.high,
+                        "recommended": mu_0[i]})
+
+    return pd.DataFrame(results)
+```
+
+```{python}
+# Ejecutamos la función para obtener un intervalo t individual para cada
+# variable y comparar cada uno con su media recomendada.
+multiple_t_testci(X, mu_0)
+```
+
+```{python}
+def bonferroni(X: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
+    '''
+    Calcula intervalos de confianza simultáneos con corrección de Bonferroni.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos.
+    alpha: float
+        Nivel de significancia.
+
+    Output
+    ------
+    res: pd.DataFrame
+        Data frame con los nombres de las variables, sus medias muestrales y los límites inferior y superior del intervalo de confianza con corrección de Bonferroni.
+    '''
+    ## Encontramos el tamaño de
+    ## muestra y número de variables
+    n, p = X.shape
+
+    ## Extraemos los nombres de las variables
+    cols = X.columns
+
+    ## Calculamos las medias
+    ## muestrales y las varianzas
+    ## muestrales de cada variable
+    mm = X.mean()
+    ss = X.var()
+
+    ## Encontramos el cuantil
+    ## de la distribución t
+    tt = stats.t.ppf(1 - alpha / (2 * p), n - 1)
+
+    ## Encontramos los límites
+    ## inferior y superior del
+    ## intervalo corregido
+    lower = mm - tt * np.sqrt(ss / n)
+    upper = mm + tt * np.sqrt(ss / n)
+
+    ## Juntamos los resultados
+    ## en un solo data frame
+    res = pd.DataFrame({"variable": cols,
+                        "mean": mm,
+                        "lower": lower,
+                        "upper": upper})
+
+    return res
+```
+
+```{python}
+# Aplicamos la función a X para obtener los intervalos simultáneos de
+# Bonferroni de todas las variables nutricionales.
+bonferroni(X)
+```
+
+```{python}
+# Estandarizamos la diferencia entre cada observación y su valor recomendado.
+# La raíz de la diagonal de S contiene las desviaciones estándar muestrales.
+Z = (X - mu_0) / np.sqrt(np.diag(S))
+```
+
+```{python}
+# Guardamos los resultados de los intervalos de Bonferroni en un DataFrame
+# para prepararlos antes de construir la gráfica.
+bf = bonferroni(X)
+```
+
+```{python}
+# Sustituimos los nombres originales por etiquetas más legibles para la gráfica.
+# El orden debe coincidir con el orden actual de las columnas de X.
+bf["variable"] = ["Calcium", "Iron", "Protein", "Vitamin A", "Vitamin C"]
+```
+
+
+```{python}
+# Importamos de plotnine los componentes necesarios para construir y dar
+# formato a la gráfica con una sintaxis similar a ggplot2.
+from plotnine import ggplot, aes, geom_pointrange, geom_hline, labs, theme_bw, theme, element_text, ggsave
+```
+
+```{python}
+# Creamos una gráfica de perfil: para cada variable, el punto representa la
+# media muestral y la línea vertical sus límites de confianza de Bonferroni.
+p = (ggplot(bf, aes(x = "variable", y = "mean")) +
+        geom_pointrange(aes(ymin = "lower", ymax = "upper"), color = "dodgerblue") +
+        # Agregamos una línea horizontal de referencia en y = 1.
+        geom_hline(yintercept = 1, linetype = "dashed", color = "gray") +
+        # Definimos las etiquetas de los ejes y el título.
+        labs(x = "", y = "Ratio", title = "Profile plot") +
+        # Aplicamos un fondo limpio y personalizamos títulos, ejes y textos.
+        theme_bw() +
+        theme(plot_title = element_text(ha = "center",
+                                        weight = "bold",
+                                        margin = {"b":5}),
+              axis_title_x = element_text(weight = "bold"),
+              axis_title_y = element_text(weight = "bold", rotation = 90),
+              axis_text_x = element_text(size = 12, weight = "bold"),
+              legend_title = element_text(ha = "center", weight = "bold"),
+              legend_text = element_text(ha = "center"),
+              strip_text = element_text(ha = "center", weight = "bold",
+                                        margin = {"t":2, "r":3, "b":3, "l":3}),
+              plot_subtitle = element_text(ha = "center", weight = "bold",
+                                        size = 10, margin = {"b":5})) +
+        # Establecemos el tamaño y la proporción de la figura.
+        theme(figure_size = (7, 7*0.618)))
+
+# Mostramos la gráfica resultante.
+p
+```

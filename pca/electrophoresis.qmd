@@ -1,0 +1,180 @@
+
+---
+jupyter: python3
+---
+
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+data = pd.read_csv("/Users/mateoflores/Documents/Tec/ProjectMultivariados/data/electrophoresis.csv")
+data.head()
+```
+
+```{python}
+from sklearn.decomposition import PCA
+
+pca = PCA(n_components = None, svd_solver = "full")
+```
+
+```{python}
+pca_fit = pca.fit(data)
+```
+
+```{python}
+import numpy as np
+np.sqrt(pca_fit.explained_variance_)
+```
+
+```{python}
+prop_variance = pca_fit.explained_variance_ratio_
+prop_variance
+```
+
+```{python}
+cumulative_prop = prop_variance.cumsum()
+```
+
+```{python}
+loadings = pca_fit.components_
+```
+
+```{python}
+scores = pca_fit.fit_transform(data)
+```
+
+```{python}
+df = pd.DataFrame({"PC1": scores[:, 0],
+                   "PC2": scores[:, 1]})
+```
+
+```{python}
+sns.scatterplot(
+    data=df,
+    x = 'PC1',
+    y = 'PC2',
+)
+
+plt.show()
+```
+
+
+```{python}
+x_bar = data.mean().values
+```
+
+```{python}
+S = np.cov(data, rowvar=False)
+```
+
+```{python}
+Lambda, Gamma = np.linalg.eig(S)
+```
+
+```{python}
+idx = Lambda.argsort()[::-1]
+Lambda = Lambda[idx]
+Lambda = Lambda.real
+Gamma = Gamma[:, idx]
+Gamma = Gamma.real
+```
+
+```{python}
+print(f"Usando la descomposición espectral: {Lambda}")
+print(f"Usando scikit-learn: {pca_fit.explained_variance_}")
+```
+
+```{python}
+pd.DataFrame(Gamma)
+```
+
+```{python}
+pd.DataFrame(pca_fit.components_.T)
+```
+
+```{python}
+(Lambda/Lambda.sum()).cumsum()
+```
+
+```{python}
+q = 2
+E = Gamma[:, :q]
+```
+
+```{python}
+Z = (data - x_bar) @ E
+```
+
+```{python}
+Z = Z.rename({0: "PC1", 1: "PC2"}, axis=1)
+```
+
+```{python}
+sns.scatterplot(Z,
+                x = "PC1",
+                y = "PC2",
+                color = "dodgerblue")
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+plt.title("Scores")
+plt.show();
+```
+
+```{python}
+x_hat = Z @ E.T + x_bar
+```
+
+```{python}
+x_hat.columns = data.columns
+```
+
+```{python}
+(len(data) - 1) * Lambda[q:].sum()
+```
+
+```{python}
+__________
+```
+
+```{python}
+R = __________
+```
+
+```{python}
+Lambda_R, Gamma_R = __________
+```
+
+```{python}
+idx = __________
+Lambda_R = __________
+Gamma_R = __________
+```
+
+```{python}
+variance_explained = __________/(__________)
+```
+
+```{python}
+__________.__________()
+```
+
+```{python}
+q = __________
+E = __________
+```
+
+```{python}
+Z = __________
+```
+
+```{python}
+Z = __________.__________({__________}, __________)
+```
+
+```{python}
+import plotly.express as px
+
+fig = px.scatter_3d(Z, x = "PC1", y = "PC2", z = "PC3")
+fig.show();
+```

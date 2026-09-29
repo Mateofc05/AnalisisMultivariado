@@ -1,0 +1,80 @@
+--
+title:"Skulls: prueba hotelling"
+format: html
+--
+
+```{python}
+import pandas as pd
+import numpy as np
+from scipy import stats
+```
+
+
+```{python}
+skulls = pd.read_csv("/Users/mateoflores/Documents/Tec/ProjectMultivariados/data/skulls.csv")
+skulls.head()
+```
+
+
+```{python}
+X = skulls[skulls["sex"] == "male"].drop(columns=["sex"])
+X.head()
+```
+
+
+```{python}
+Y = skulls[skulls["sex"] == "female"].drop(columns=["sex"])
+Y.head()
+```
+
+
+```{python}
+def HotellingsT2Test(X: pd.DataFrame, Y: pd.DataFrame) -> tuple[np.float64, np.float64]:
+    '''
+    Realiza la prueba T2 de Hotelling para dos muestras.
+
+    Parámetros
+    ----------
+    X: pd.DataFrame
+        Matriz de datos de la primera población.
+    Y: pd.DataFrame
+        Matriz de datos de la segunda población.
+
+    Output
+    ------
+    statistic: np.float64
+        Valor de la estadística de prueba.
+    p-value: np.float64
+        P-value resultante.
+    '''
+    ## Encontramos los tamaños de
+    ## muestra y el número de variables
+    n, p = X.shape
+    m = len(Y)
+
+    ## Calculamos la diferencia de medias
+    ## muestrales, las matrices de covarianza
+    ## y la matriz de covarianza agrupada
+    delta = ((X.mean()) - (Y.mean())).values
+    Sx = np.cov(X, rowvar = False)
+    Sy = np.cov(Y, rowvar = False)
+    S_pooled = ((n - 1) * Sx + (m - 1) * Sy) / (n + m - 2)
+
+    ## Calculamos la estadística de prueba
+    t2 = delta @ np.linalg.inv(S_pooled * (1/n + 1/m)) @ delta
+    statistic = (n + m - p - 1) / (p * (n + m - 2)) * t2
+
+    ## Calculamos el p-value
+    p_value = 1 - stats.f.cdf(statistic, p, n + m - p - 1)
+
+    ## Imprimimos el resultado
+    print(f"Estadística de prueba: {statistic}\nGrados de libertad: {p}, {n + m - p - 1}\np-value: {p_value}")
+
+    return statistic, p_value
+```
+
+
+```{python}
+HotellingsT2Test(X, Y)
+```
+

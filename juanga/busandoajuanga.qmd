@@ -1,0 +1,81 @@
+
+--
+format: html
+
+---
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scipy.stats as stats
+```
+
+```{python}
+ink = pd.read_csv("/Users/mateoflores/Documents/Tec/ProjectMultivariados/data/ink.csv")
+ink.head()
+```
+
+```{python}
+ink.shape
+```
+
+```{python}
+ink.isna().sum()
+```
+
+```{python}
+combinado = pd.read_csv("/Users/mateoflores/Documents/Tec/ProjectMultivariados/data/combinado.csv")
+combinado.head()
+```
+
+```{python}
+combinado.shape
+```
+
+```{python}
+combinado["id_lote"].duplicated().sum()
+```
+
+```{python}
+combinado.isna().sum()
+```
+
+```{python}
+combinado.describe()
+```
+
+```{python}
+combinado["pH"].between(0, 14).all()
+```
+
+```{python}
+variables_oficiales = [
+    "pigmento_magnetico_pct",
+    "viscosidad_cP",
+    "pH",
+    "reflectancia_UV_pct",
+    "secado_s"
+]
+```
+
+```{python}
+mu_0 = combinado[variables_oficiales].mean().values
+mu_0
+```
+
+```{python}
+variables_ink = [
+    "pigmento_magnetico_pct",
+    "viscosidad_cp",
+    "ph",
+    "reflectancia_uv_pct",
+    "tiempo_secado_s"
+]
+```
+
+```{python}
+X = ink[variables_ink]
+X.head()
+```
