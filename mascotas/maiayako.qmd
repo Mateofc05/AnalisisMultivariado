@@ -31,3 +31,127 @@ for i in range(1, n + 1):
     resized_image = cv2.resize(image, (width, height))
     images[i - 1, :, :] = resized_image
 ```
+
+```{python}
+images.shape
+```
+
+```{python}
+plt.figure(figsize = (8, 8))
+for i in range(n):
+    plt.subplot(2, 2, i + 1)
+    plt.title("Maya " + str(i + 1))
+    plt.imshow(images[i], cmap = "gray")
+    plt.axis("off")
+```
+
+```{python}
+X = images.reshape(images.shape[0], -1)
+64 * 64
+```
+
+```{python}
+X.shape
+```
+
+```{python}
+X_bar = X.mean(axis = 0)
+```
+
+```{python}
+X_star = X - X_bar
+```
+
+```{python}
+U, D, Vt = np.linalg.svd(X_star.T, full_matrices = False)
+```
+
+```{python}
+idx = D.argsort()[::-1]
+D = D[idx]
+U = U[:, idx]
+Vt = Vt[:, idx]
+```
+
+```{python}
+loadings = U
+```
+
+```{python}
+explained_variance = D**2 / (n - 1)
+```
+
+```{python}
+explained_variance < explained_variance.mean()
+```
+
+```{python}
+q = 2
+E = U[:, :q]
+```
+
+```{python}
+plt.figure(figsize = (10, 10))
+for i in range(q):
+    eigenface = E[:, i].reshape(64, 64).astype("float")
+    plt.subplot(1, q, i + 1)
+    plt.title("EigenMaya " + str(i + 1))
+    plt.imshow(eigenface, cmap = "gray")
+    plt.axis("off")
+plt.show();
+```
+
+```{python}
+Z = X_star @ E
+```
+
+```{python}
+import pandas as pd
+
+df = pd.DataFrame(Z, columns = ["PC1", "PC2"])
+```
+
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.scatterplot(df,
+                x = "PC1",
+                y = "PC2",
+                color = "dodgerblue")
+plt.title("Maya en menor dimensión")
+plt.show();
+```
+
+```{python}
+X_hat = Z @ E.T + X_bar
+```
+
+```{python}
+plt.figure(figsize = (8, 8))
+for i in range(n):
+    eigenface = X_hat[i, :].reshape(64, 64).astype("float")
+    plt.subplot(2, 2, i + 1)
+    plt.title("Maya reconstruida " + str(i + 1))
+    plt.imshow(eigenface, cmap = "gray")
+    plt.axis("off")
+plt.show();
+```
+
+```{python}
+explained_variance_ratio = explained_variance / explained_variance.sum()
+```
+
+```{python}
+PCs = np.arange(len(explained_variance)) + 1
+```
+
+```{python}
+plt.plot(PCs, explained_variance_ratio, "o-",
+         linewidth = 2, color = "dodgerblue")
+plt.xticks(PCs)
+plt.title("Scree plot")
+plt.xlabel("PC")
+plt.ylabel("Proporción de varianza explicada")
+plt.show();
+```
