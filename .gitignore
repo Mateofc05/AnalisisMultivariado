@@ -13,3 +13,6 @@ wheels/
 **/*.quarto_ipynb
 
 .DS_Store
+
+# Local package and rendering caches
+/.cache/

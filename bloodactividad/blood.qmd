@@ -1,0 +1,243 @@
+--
+title:"Blood Activity"
+format: html
+--
+
+```{python}
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+```
+
+```{python}
+blood = pd.read_csv("../data/blood.csv")
+blood.head()
+```
+
+```{python}
+X = blood[["lbxsatsi", "lbxsassi", "lbdstpsi", "lbxsnasi",
+           "lbxsclsi", "lbxsossi", "lbdsgbsi"]].copy()
+```
+
+```{python}
+X.dropna(inplace=True)
+```
+
+```{python}
+cormat = round(X.corr(numeric_only=True), 2)
+```
+
+```{python}
+mask = np.triu(np.ones_like(cormat, dtype = bool))
+```
+
+```{python}
+col = sns.diverging_palette(255, 0, as_cmap = True)
+```
+
+```{python}
+plt.figure(figsize = (12, 6))
+sns.heatmap(cormat, mask = mask, annot = True, cmap = col)
+plt.show();
+```
+
+```{python}
+scaler = StandardScaler()
+```
+
+```{python}
+X_std = scaler.fit_transform(X)
+```
+
+```{python}
+pca = PCA(n_components=2)
+```
+
+```{python}
+pca_fit = pca.fit(X_std)
+```
+
+```{python}
+scores = pca_fit.transform(X_std)
+```
+
+```{python}
+pca_df = pd.DataFrame(scores, columns = ["PC1", "PC2"])
+```
+
+```{python}
+## Scatter plot
+fig = px.scatter(pca_df.reset_index(),
+                 x = "PC1",
+                 y = "PC2",
+                 hover_name = "index",
+                 hover_data = {"index": False},
+                 template = "plotly_white",
+                 opacity = 0.3)
+
+## Color de los puntos
+fig.update_traces(marker = dict(color = "dodgerblue"))
+
+## Líneas de referencia
+fig.add_vline(x = 0, line_width = 1,
+              line_dash = "dash",
+              line_color = "gray")
+fig.add_hline(y = 0, line_width = 1,
+              line_dash = "dash",
+              line_color = "gray")
+
+## Formato de los ejes
+fig.update_xaxes(showline = True,
+                 linewidth = 1,
+                 linecolor = "black",
+                 mirror = True,
+                 showgrid = True,
+                 gridcolor = "lightgray",
+                 zeroline = False)
+fig.update_yaxes(showline = True,
+                 linewidth = 1,
+                 linecolor = "black",
+                 mirror = True,
+                 showgrid = True,
+                 gridcolor = "lightgray",
+                 zeroline = False)
+fig.update_layout(width = 500, height = 500)
+fig.show()
+```
+
+```{python}
+loadings = pca_fit.components_.T
+```
+
+```{python}
+colors = px.colors.qualitative.Dark24
+```
+
+```{python}
+features = X.columns
+```
+
+```{python}
+## Gráfica de los vectores
+fig = px.scatter(template = "plotly_white")
+for i, feature in enumerate(features):
+    fig.add_trace(go.Scatter(
+        x = [0, loadings[i, 0]],
+        y = [0, loadings[i, 1]],
+        mode = "lines+markers",
+        name = feature,
+        line = dict(color = colors[i],
+                    width = 2),
+        marker = dict(symbol = "arrow",
+                      size = [0, 14],
+                      angleref = "previous", color = colors[i]),
+        hovertemplate = (f"<b>{feature}</b><br>"
+                       f"PC1: {loadings[i, 0]:.3f}<br>"
+                       f"PC2: {loadings[i, 1]:.3f}<extra></extra>"),
+        legend = "legend1"))
+fig.update_layout(legend1 = dict(title = "Variables",
+                                 yanchor = "top"))
+
+## Líneas de referencia
+fig.add_vline(x = 0, line_width = 1,
+              line_dash = "dash",
+              line_color = "gray")
+fig.add_hline(y = 0, line_width = 1,
+              line_dash = "dash",
+              line_color = "gray")
+
+## Formato de los ejes
+fig.update_xaxes(showline = True,
+                 linewidth = 1,
+                 linecolor = "black",
+                 mirror = True,
+                 showgrid = True,
+                 gridcolor = "lightgray",
+                 zeroline = False)
+fig.update_yaxes(showline = True,
+                 linewidth = 1,
+                 linecolor = "black",
+                 mirror = True,
+                 showgrid = True,
+                 gridcolor = "lightgray",
+                 zeroline = False)
+fig.update_xaxes(title_text = "PC1")
+fig.update_yaxes(title_text = "PC2")
+fig.update_layout(width = 600, height = 500)
+fig.show()
+```
+
+```{python}
+pca_df_scaled = pca_df.copy()
+```
+
+```{python}
+scaler = 1/(pca_df_scaled.max() - pca_df_scaled.min())
+```
+
+```{python}
+for index in scaler.index:
+    pca_df_scaled[index] = pca_df_scaled[index] * scaler[index]
+```
+
+```{python}
+## Observaciones
+fig = px.scatter(pca_df_scaled.reset_index(),
+                 x = "PC1",
+                 y = "PC2",
+                 hover_name = "index",
+                 hover_data = {"index": False},
+                 template = "plotly_white",
+                 opacity = 0.3,
+                 title = "Biplot",
+                 render_mode = "svg")
+fig.update_traces(marker = dict(color = "dodgerblue"))
+
+## Variables
+for i, feature in enumerate(features):
+    fig.add_trace(go.Scatter(
+        x = [0, loadings[i, 0]],
+        y = [0, loadings[i, 1]],
+        mode = "lines+markers",
+        name = feature,
+        line = dict(color = colors[i],
+                    width = 2),
+        marker = dict(symbol = "arrow",
+                      size = [0, 14],
+                      angleref = "previous", color = colors[i]),
+        hovertemplate = (f"<b>{feature}</b><br>"
+                       f"PC1: {loadings[i, 0]:.3f}<br>"
+                       f"PC2: {loadings[i, 1]:.3f}<extra></extra>"),
+        legend = "legend1"))
+fig.update_layout(legend1 = dict(title = "Variables",
+                                 yanchor = "top"))
+
+## Formato de los ejes
+fig.add_vline(x = 0, line_width = 1,
+              line_dash = "dash",
+              line_color = "gray")
+fig.add_hline(y = 0, line_width = 1,
+              line_dash = "dash",
+              line_color = "gray")
+fig.update_xaxes(showline = True,
+                 linewidth = 1,
+                 linecolor = "black",
+                 mirror = True,
+                 showgrid = True,
+                 gridcolor = "lightgray",
+                 zeroline = False)
+fig.update_yaxes(showline = True,
+                 linewidth = 1,
+                 linecolor = "black",
+                 mirror = True,
+                 showgrid = True,
+                 gridcolor = "lightgray",
+                 zeroline = False)
+fig.update_layout(width = 600, height = 500)
+fig.show()
+```
