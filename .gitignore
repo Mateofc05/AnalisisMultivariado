@@ -16,3 +16,6 @@ wheels/
 
 # Local package and rendering caches
 /.cache/
+
+# El dataset completo se versiona comprimido para respetar el límite de GitHub.
+/data/NSDUH_2023.txt

@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "factor-analyzer>=0.5.1",
     "hvplot>=0.12.2",
     "ipykernel>=7.3.0",
     "ipywidgets>=8.1.8",
@@ -22,11 +23,15 @@ dependencies = [
     "plotly>=7.1.0",
     "plotnine>=0.15.3",
     "pyyaml>=6.0.3",
-    "scikit-learn>=1.9.0",
+    "scikit-learn==1.7.2",
     "scipy>=1.18.0",
     "seaborn>=0.13.2",
     "statsmodels>=0.15.0",
+    "uv>=0.13.4",
 ]
+
+[tool.uv.sources]
+factor-analyzer = { git = "https://github.com/EducationalTestingService/factor_analyzer.git", rev = "de933d26808039d965c117874c67260ec5149690" }
 
 
 

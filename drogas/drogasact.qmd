@@ -1,0 +1,86 @@
+--
+title:" Análisis de factores de drogas"
+format: html
+--
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+```
+
+```{python}
+drugs = pd.read_csv("/Users/mateoflores/Documents/Tec/ProjectMultivariados/data/NSDUH_2023.txt", sep = "\t")
+drugs.head()
+```
+
+```{python}
+substances = ["CIGEVER", "ALCEVER", "MJEVER", "COCEVER", "CRKEVER",
+              "HEREVER", "LSD", "PCP", "PEYOTE", "ECSTMOLLY", "KETMINESK",
+              "GLUE", "SOLVENT", "METHAMEVR"]
+```
+
+```{python}
+X = drugs[substances]
+```
+
+```{python}
+coding = {1: 1, 2: 0, 3: 1, 85: np.nan, 94: np.nan, 97: np.nan, 91: 0, 98: np.nan}
+```
+
+```{python}
+X = X.replace(coding)
+```
+
+```{python}
+X.head()
+```
+
+```{python}
+X.dropna(inplace=True)
+```
+
+```{python}
+uv add factor_analyzer
+```
+
+```{python}
+from factor_analyzer import FactorAnalyzer
+```
+
+```{python}
+fa = FactorAnalyzer(n_factors = 1, method = "ml", rotation = None)
+```
+
+```{python}
+fa_fit = fa.fit(X)
+```
+
+```{python}
+loadings_fa1 = pd.DataFrame(fa_fit.loadings_, columns = ["Factor1"], index = substances)
+```
+
+```{python}
+fa = FactorAnalyzer(n_factors = 2, method = "ml", rotation = None)
+```
+
+```{python}
+fa_fit = fa.fit(X)
+```
+
+```{python}
+loadings_fa2 = pd.DataFrame(fa_fit.loadings_, columns = ["Factor1", "Factor2"], index = substances)
+```
+
+```{python}
+fa = FactorAnalyzer(n_factors = 5, method = "ml", rotation = None)
+```
+
+```{python}
+fa_fit = fa.fit(X)
+```
+
+```{python}
+pd.DataFrame(fa_fit.loadings_, columns = ["Factor1", "Factor2", "Factor3", "Factor4", "Factor5"], index = substances)
+```
