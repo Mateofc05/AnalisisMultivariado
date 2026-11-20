@@ -1,0 +1,16 @@
+name: movie-reco
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pandas<3
+  - numpy
+  - matplotlib
+  - seaborn
+  - scipy
+  - scikit-learn
+  - nltk
+  - scikit-surprise
+  - jupyter
+  - ipykernel
